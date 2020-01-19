@@ -227,7 +227,7 @@ namespace NCalc.Domain
         public override string ToString()
         {
             SerializationVisitor serializer = new SerializationVisitor();
-            this.Accept(serializer);
+            Accept(serializer);
 
             return serializer.Result.ToString().TrimEnd(' ');
         }

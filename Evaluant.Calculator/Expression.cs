@@ -37,11 +37,8 @@ namespace NCalc
 
         public Expression(LogicalExpression expression, EvaluateOptions options)
         {
-            if (expression == null)
-                throw new
+            ParsedExpression = expression ?? throw new
                     ArgumentException("Expression can't be null", "expression");
-
-            ParsedExpression = expression;
             Options = options;
         }
 
@@ -190,7 +187,7 @@ namespace NCalc
         protected Dictionary<string, IEnumerator> ParameterEnumerators;
         protected Dictionary<string, object> ParametersBackup;
 
-        public object Evaluate()
+        private void Check()
         {
             if (HasErrors())
             {
@@ -201,7 +198,19 @@ namespace NCalc
             {
                 ParsedExpression = Compile(OriginalExpression, (Options & EvaluateOptions.NoCache) == EvaluateOptions.NoCache);
             }
+        }
 
+        public HashSet<string> UsedParameters()
+        {
+            Check();
+            var visitor = new ParameterExtractionVisitor();
+            ParsedExpression.Accept(visitor);
+            return visitor.Parameters;
+        }
+
+        public object Evaluate()
+        {
+            Check();
 
             var visitor = new EvaluationVisitor(Options);
             visitor.EvaluateFunction += EvaluateFunction;
@@ -209,63 +218,63 @@ namespace NCalc
             visitor.Parameters = Parameters;
 
             // if array evaluation, execute the same expression multiple times
-            if ((Options & EvaluateOptions.IterateParameters) == EvaluateOptions.IterateParameters)
-            {
-                int size = -1;
-                ParametersBackup = new Dictionary<string, object>();
-                foreach (string key in Parameters.Keys)
-                {
-                    ParametersBackup.Add(key, Parameters[key]);
-                }
+            //if ((Options & EvaluateOptions.IterateParameters) == EvaluateOptions.IterateParameters)
+            //{
+            //    int size = -1;
+            //    ParametersBackup = new Dictionary<string, object>();
+            //    foreach (string key in Parameters.Keys)
+            //    {
+            //        ParametersBackup.Add(key, Parameters[key]);
+            //    }
 
-                ParameterEnumerators = new Dictionary<string, IEnumerator>();
+            //    ParameterEnumerators = new Dictionary<string, IEnumerator>();
 
-                foreach (object parameter in Parameters.Values)
-                {
-                    if (parameter is IEnumerable)
-                    {
-                        int localsize = 0;
-                        foreach (object o in (IEnumerable)parameter)
-                        {
-                            localsize++;
-                        }
+            //    foreach (object parameter in Parameters.Values)
+            //    {
+            //        if (parameter is IEnumerable)
+            //        {
+            //            int localsize = 0;
+            //            foreach (object o in (IEnumerable)parameter)
+            //            {
+            //                localsize++;
+            //            }
 
-                        if (size == -1)
-                        {
-                            size = localsize;
-                        }
-                        else if (localsize != size)
-                        {
-                            throw new EvaluationException("When IterateParameters option is used, IEnumerable parameters must have the same number of items");
-                        }
-                    }
-                }
+            //            if (size == -1)
+            //            {
+            //                size = localsize;
+            //            }
+            //            else if (localsize != size)
+            //            {
+            //                throw new EvaluationException("When IterateParameters option is used, IEnumerable parameters must have the same number of items");
+            //            }
+            //        }
+            //    }
 
-                foreach (string key in Parameters.Keys)
-                {
-                    var parameter = Parameters[key] as IEnumerable;
-                    if (parameter != null)
-                    {
-                        ParameterEnumerators.Add(key, parameter.GetEnumerator());
-                    }
-                }
+            //    foreach (string key in Parameters.Keys)
+            //    {
+            //        var parameter = Parameters[key] as IEnumerable;
+            //        if (parameter != null)
+            //        {
+            //            ParameterEnumerators.Add(key, parameter.GetEnumerator());
+            //        }
+            //    }
 
-                var results = new List<object>();
-                for (int i = 0; i < size; i++)
-                {
-                    foreach (string key in ParameterEnumerators.Keys)
-                    {
-                        IEnumerator enumerator = ParameterEnumerators[key];
-                        enumerator.MoveNext();
-                        Parameters[key] = enumerator.Current;
-                    }
+            //    var results = new List<object>();
+            //    for (int i = 0; i < size; i++)
+            //    {
+            //        foreach (string key in ParameterEnumerators.Keys)
+            //        {
+            //            IEnumerator enumerator = ParameterEnumerators[key];
+            //            enumerator.MoveNext();
+            //            Parameters[key] = enumerator.Current;
+            //        }
 
-                    ParsedExpression.Accept(visitor);
-                    results.Add(visitor.Result);
-                }
+            //        ParsedExpression.Accept(visitor);
+            //        results.Add(visitor.Result);
+            //    }
 
-                return results;
-            }
+            //    return results;
+            //}
 
             ParsedExpression.Accept(visitor);
             return visitor.Result;
@@ -275,11 +284,11 @@ namespace NCalc
         public event EvaluateFunctionHandler EvaluateFunction;
         public event EvaluateParameterHandler EvaluateParameter;
 
-        private Dictionary<string, object> _parameters;
+        private Dictionary<string, double> _parameters;
 
-        public Dictionary<string, object> Parameters
+        public Dictionary<string, double> Parameters
         {
-            get { return _parameters ?? (_parameters = new Dictionary<string, object>()); }
+            get { return _parameters ?? (_parameters = new Dictionary<string, double>()); }
             set { _parameters = value; }
         }
 
